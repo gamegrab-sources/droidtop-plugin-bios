@@ -1,0 +1,22 @@
+{
+  "comment": "Files the 3DS and Switch emulators ask for that droidtop-platforms' bios-database.json has no rows for. Each names a file of Abdess/retrobios by its path; gen_index.py takes size and hashes from retrobios' own database and refuses a path it no longer lists. Console-unique dumps (otp.bin, movable.sed, SecureInfo) are left out on purpose: they are not shared files.",
+  "systems": {
+    "3ds": {
+      "name": "Nintendo 3DS",
+      "files": [
+        {"name": "aes_keys.txt", "dir": "sysdata", "retrobios": "bios/Nintendo/3DS/aes_keys.txt", "note": "The 3DS encryption keys Azahar and Citra-family emulators read to open encrypted games. Goes in the emulator's sysdata folder."},
+        {"name": "boot9.bin", "dir": "sysdata", "retrobios": "bios/Nintendo/3DS/boot9.bin", "note": "The 3DS boot ROM. Goes in the emulator's sysdata folder."},
+        {"name": "seeddb.bin", "dir": "sysdata", "retrobios": "bios/Nintendo/3DS/Citra/sysdata/seeddb.bin", "note": "Seed database for games whose content is encrypted with a seed. Goes in the emulator's sysdata folder."},
+        {"name": "shared_font.bin", "dir": "sysdata", "retrobios": "bios/Nintendo/3DS/Citra/sysdata/shared_font.bin", "note": "The 3DS shared font, for games that draw text with the system font. Goes in the emulator's sysdata folder."}
+      ]
+    },
+    "switch": {
+      "name": "Nintendo Switch",
+      "files": [
+        {"name": "prod.keys", "dir": "keys", "retrobios": "bios/Nintendo/Switch/prod.keys", "note": "The Switch production keys Yuzu-family emulators need to run any game. Goes in the emulator's keys folder."},
+        {"name": "title.keys", "dir": "keys", "retrobios": "bios/Nintendo/Switch/title.keys", "note": "Title keys for games that ship with their own. Goes in the emulator's keys folder."},
+        {"name": "Firmware_batocera43.zip", "dir": "firmware", "retrobios": "bios/Nintendo/Switch/Firmware_batocera43.zip", "note": "A Switch firmware package (large). Unpack it into the emulator's nand system contents, or install it from the emulator's own menu."}
+      ]
+    }
+  }
+}

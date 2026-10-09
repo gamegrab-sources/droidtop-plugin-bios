@@ -1,0 +1,98 @@
+name: Build
+
+# Every push and pull request: the unit tests, then the plugin bundle (built and smoke-tested). A push to main also
+# signs the bundle with this repository's own key and publishes it as a permanent release (one per working build),
+# when the key is set. The key comes from the gamegrab-sources master, never droidtop's: PLUGIN_SIGNING_KEY and its
+# certificate PLUGIN_SIGNING_CERT, both set by plugin-key-provision.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: The declared version moves with the code
+        # droidtop's rule (Droidtop/tracker#126): a revision whose plugin sources changed carries a new declared version.
+        run: |
+          if git rev-parse -q --verify HEAD~1 >/dev/null; then
+            if git diff --quiet HEAD~1 HEAD -- src data build.sh manifest.template.json; then
+              echo "no plugin source changed"
+            else
+              old="$(git show HEAD~1:manifest.template.json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' || true)"
+              new="$(python3 -c 'import json; print(json.load(open("manifest.template.json"))["version"])')"
+              if [ -n "$old" ] && [ "$old" = "$new" ]; then
+                echo "::error::plugin sources changed but manifest.template.json still declares $new; bump it (and CHANGELOG.md)"
+                exit 1
+              fi
+              echo "declared version $old -> $new"
+            fi
+          fi
+
+      - run: python3 test_plugin.py
+
+  bundle:
+    name: Plugin bundle
+    needs: check
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the bundle (unsigned payload and manifest)
+        env:
+          DROIDTOP_PLUGIN_BUILD: ${{ github.run_number }}
+        run: ./build.sh
+
+      - name: The tests again, against the file that ships
+        run: TEST_BUILT=1 python3 test_plugin.py
+
+      - name: Sign
+        id: sign
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          KEY_PEM: ${{ secrets.PLUGIN_SIGNING_KEY }}
+          CERT_JSON: ${{ secrets.PLUGIN_SIGNING_CERT }}
+        run: |
+          if [ -z "$KEY_PEM" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "PLUGIN_SIGNING_KEY is not set on this repository: no signed bundle, no release." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          test -n "$CERT_JSON" || { echo "::error::PLUGIN_SIGNING_KEY is set but PLUGIN_SIGNING_CERT is not: droidtop refuses a bundle without its certificate"; exit 1; }
+          umask 077
+          KEYFILE="$RUNNER_TEMP/plugin-signing-key.pem"
+          CERTFILE="$RUNNER_TEMP/origin.cert"
+          printf '%s' "$KEY_PEM" > "$KEYFILE"
+          printf '%s' "$CERT_JSON" > "$CERTFILE"
+          PLUGIN_SIGNING_KEY_FILE="$KEYFILE" PLUGIN_SIGNING_CERT_FILE="$CERTFILE" ./sign.sh
+          rm -f -- "$KEYFILE" "$CERTFILE"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the release
+        # One permanent release per working build of main: tag v<declared>-<run>, carrying the signed bundle and its
+        # manifest (the gamegrab-sources catalog lists plugins from these).
+        if: steps.sign.outputs.signed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id="$(python3 -c "import json; print(json.load(open('build/manifest.json'))['id'])")"
+          version="$(python3 -c "import json; print(json.load(open('build/manifest.json'))['version'])")"
+          cp build/manifest.json "$id.manifest.json"
+          gh release create "v$version" "$id.droidplugin.tar.xz" "$id.manifest.json" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "BIOS and firmware $version" \
+            --notes "Signed droidtop plugin bundle built from ${{ github.sha }}. Unofficial (gamegrab-sources): its key is certified by the gamegrab-sources master, which droidtop trusts once you add the gamegrab-sources catalog. What changed: CHANGELOG.md."

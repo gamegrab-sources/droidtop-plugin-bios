@@ -1,0 +1,14 @@
+droidtop-plugin-bios (gamegrab-sources), GPL-3.0.
+
+The file lists and MD5s come from droidtop-platforms' bios-database.json
+(https://github.com/Droidtop/droidtop-platforms), which is generated from Batocera's batocera-systems registry
+(https://github.com/batocera-linux/batocera.linux, GPL).
+
+The sources and their SHA-256 values come from Abdess/retrobios (https://github.com/Abdess/retrobios), whose tooling
+is MIT-licensed. The BIOS and firmware files it hosts are third-party system software and are not covered by that
+licence; see its NOTICE for their status and for removal requests. This plugin does not copy any of those files: it
+points droidtop at them.
+
+The Internet Archive item "retroarch_bios" is uploaded by LibRetro (https://archive.org/details/retroarch_bios).
+
+This plugin is not affiliated with droidtop's official components, Batocera, retrobios, LibRetro or the Internet Archive.

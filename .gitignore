@@ -1,0 +1,4 @@
+build/
+*.droidplugin.tar.xz
+*.manifest.json
+__pycache__/
