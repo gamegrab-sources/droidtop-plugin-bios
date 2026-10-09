@@ -59,8 +59,8 @@ def send(point, op, **args):
     return json.loads(plugin.handle(json.dumps({"point": point, "version": 1, "op": op, "args": args})))
 
 
-def job(op, **args):
-    return json.loads(plugin.start_job("j1", {"point": "library.sources", "op": op, "args": args}, lambda percent, status: None))
+def job(op, point="library.sources", **args):
+    return json.loads(plugin.start_job("j1", {"point": point, "op": op, "args": args}, lambda percent, status: None))
 
 
 def items(view):
@@ -146,6 +146,7 @@ class BiosPluginTest(unittest.TestCase):
         self.assertEqual("scph5500.bin", download["fileName"])
         self.assertEqual(524288, download["size"])
         self.assertRegex(download["sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual("8dd7d5296a650fac7319bce665a6a53c", download["md5"])
         self.assertEqual(1, len([c for c in calls if c[0] == "net"]))
 
     def test_acquire_stops_when_the_source_no_longer_has_the_file_or_has_another_size(self):
@@ -169,7 +170,8 @@ class BiosPluginTest(unittest.TestCase):
         self.assertEqual(url, download["url"])
         self.assertEqual("scph5500.bin", download["fileName"], "the file is named as the emulator setup expects, not as the archive")
         self.assertNotIn("sha256", download)
-        self.assertIn("MD5 matches", reply["values"]["message"])
+        self.assertIn("checked by MD5", reply["values"]["message"])
+        self.assertEqual("8dd7d5296a650fac7319bce665a6a53c", download["md5"], "droidtop verifies md5 now")
 
     # -------------------------------------------------------------- settings
 
@@ -205,6 +207,38 @@ class BiosPluginTest(unittest.TestCase):
         detail = send("library.sources", "detail", ref={"system": "psx", "file": "scph5500.bin"})
         labels = [o["label"] for o in [r for r in items(detail["data"]) if r["id"] == "source"][0]["options"]]
         self.assertTrue(any("some_bios_pack" in label for label in labels))
+
+    # ----------------------------------------------------- emulator.bios@1
+
+    def test_the_helper_is_told_which_files_can_be_supplied_with_their_md5(self):
+        reply = send("emulator.bios", "list", system="psx")
+        files = {f["name"]: f for f in reply["data"]["files"]}
+        self.assertIn("scph5500.bin", files)
+        self.assertEqual(["8dd7d5296a650fac7319bce665a6a53c"], files["scph5500.bin"]["md5"])
+        self.assertEqual(524288, files["scph5500.bin"]["size"])
+        self.assertEqual("retrobios", files["scph5500.bin"]["source"])
+        self.assertLessEqual(len(files["scph5500.bin"]["source"]), 60)
+        self.assertEqual([], send("emulator.bios", "list", system="nowhere")["data"]["files"])
+        # A file only another dump exists for is not offered: droidtop would refuse it.
+        adam = [f["name"] for f in send("emulator.bios", "list", system="adam")["data"]["files"]]
+        self.assertNotIn("adam_ddp.zip", adam)
+
+    def test_the_helper_acquire_returns_one_verified_download_of_the_dump_asked_for(self):
+        http_answers[("HEAD", RETRO_SCPH)] = {"status": 200, "url": RETRO_SCPH, "headers": {"content-length": "524288"}, "body": ""}
+        reply = job("acquire", point="emulator.bios", system="psx", name="scph5500.bin", md5=["8dd7d5296a650fac7319bce665a6a53c"])
+        self.assertTrue(reply["ok"], reply)
+        download = json.loads(reply["values"]["download"])
+        self.assertEqual("scph5500.bin", download["fileName"])
+        self.assertEqual(RETRO_SCPH, download["url"])
+        self.assertRegex(download["sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual("8dd7d5296a650fac7319bce665a6a53c", download["md5"])
+        self.assertNotIn("unpack", download)
+
+    def test_the_helper_acquire_refuses_what_it_cannot_supply(self):
+        self.assertFalse(job("acquire", point="emulator.bios", system="psx", name="nope.bin", md5=[])["ok"])
+        self.assertIn("No source", job("acquire", point="emulator.bios", system="adam", name="adam_ddp.zip", md5=[])["error"])
+        http_answers[("HEAD", RETRO_SCPH)] = {"status": 404, "url": RETRO_SCPH, "headers": {}, "body": ""}
+        self.assertIn("no longer has", job("acquire", point="emulator.bios", system="psx", name="scph5500.bin", md5=[])["error"])
 
     # ----------------------------------------------------------------- misc
 
@@ -249,7 +283,7 @@ class IndexAndManifestTest(unittest.TestCase):
         self.assertEqual("python", manifest["kind"])
         self.assertEqual("gamegrab.bios", manifest["id"])
         self.assertFalse(manifest.get("requestsRoot"))
-        self.assertEqual({"library.sources", "ui.settings"}, set(p["point"] for p in manifest["provides"]))
+        self.assertEqual({"emulator.bios", "library.sources", "ui.settings"}, set(p["point"] for p in manifest["provides"]))
         permissions = dict((p["id"], p) for p in manifest["permissions"])
         self.assertEqual({"net.domains", "library.folders.write"}, set(permissions))
         for host in plugin.DECLARED_HOSTS:

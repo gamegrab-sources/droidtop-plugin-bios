@@ -12,7 +12,8 @@ What it knows (data/index.json, built by tools/gen_index.py and embedded into th
     LibRetro BIOS collection on the Internet Archive (loose files, MD5 and size);
   * for the 3DS and the Switch, the keys and firmware their emulators ask for, which that database has no rows for.
 
-What it does with that, through the `library.sources` point (the only door droidtop offers a source today):
+What it does with that, through two points. `emulator.bios` (list, acquire) is the one the Emulator setup helper calls for "Get the BIOS for this system"; droidtop
+names the target and writes the file, and checks its MD5 against the database. `library.sources` stays for Get games:
 
   search   the files of one system (from the system the person is in) or any file matching the words typed
   detail   one file: what it is, how it is verified, which source to take it from
@@ -517,6 +518,34 @@ def _file_name(item):
     return name
 
 
+def _descriptor(item, chosen):
+    """The acquire reply's download: the file named as the database names it, with every digest the source gives."""
+    download = {"url": chosen.url, "fileName": _file_name(item)}
+    if chosen.sha256:
+        download["sha256"] = chosen.sha256
+    if chosen.exact and chosen.md5 and HASH32.match(chosen.md5):
+        download["md5"] = chosen.md5.lower()
+    if chosen.size:
+        download["size"] = chosen.size
+    return download
+
+
+def _preflight(chosen):
+    """Asks the source once whether the file is there and the size is right; an error sentence, or None."""
+    if not _declared(chosen.url):
+        return None  # an address of the person's own: droidtop's downloader fetches it, this plugin may not ask
+    try:
+        status, _final, headers, _body, _t = _http(chosen.url, method="HEAD")
+    except HostError as error:
+        return "%s did not answer: %s" % (chosen.label, error.message)
+    if status == 404:
+        return "%s no longer has this file" % chosen.label
+    length = str(headers.get("content-length", ""))
+    if chosen.size and length.isdigit() and int(length) not in (0, chosen.size) and status == 200:
+        return "%s offers a file of another size than expected (%s bytes, not %d)" % (chosen.label, length, chosen.size)
+    return None
+
+
 def _acquire(args):
     """The job: pick the chosen source, ask it once whether the file is there, hand droidtop the download."""
     ref = args.get("ref") or {}
@@ -535,23 +564,55 @@ def _acquire(args):
     if not 0 <= choice < len(candidates):
         choice = 0
     chosen = candidates[choice]
-    if _declared(chosen.url):
-        try:
-            status, _final, headers, _body, _t = _http(chosen.url, method="HEAD")
-        except HostError as error:
-            return {"ok": False, "error": "%s did not answer: %s" % (chosen.label, error.message)}
-        if status == 404:
-            return {"ok": False, "error": "%s no longer has this file" % chosen.label}
-        length = str(headers.get("content-length", ""))
-        if chosen.size and length.isdigit() and int(length) not in (0, chosen.size) and status == 200:
-            return {"ok": False, "error": "%s offers a file of another size than expected (%s bytes, not %d)" % (chosen.label, length, chosen.size)}
-    download = {"url": chosen.url, "fileName": _file_name(item)}
-    if chosen.sha256:
-        download["sha256"] = chosen.sha256
-    if chosen.size:
-        download["size"] = chosen.size
-    note = "checked by SHA-256" if chosen.sha256 else ("MD5 matches droidtop's list" if chosen.exact else "not checked: a different dump or an address of your own")
+    problem = _preflight(chosen)
+    if problem:
+        return {"ok": False, "error": problem}
+    download = _descriptor(item, chosen)
+    note = "checked by SHA-256" if chosen.sha256 else ("checked by MD5" if chosen.exact else "not checked: a different dump or an address of your own")
     return {"ok": True, "values": {"message": "Downloading %s (%s)" % (item["name"], note), "download": json.dumps(download)}}
+
+
+# ---------------------------------------------------------------------------------- emulator.bios@1 (A11)
+
+
+def _bios_list(args):
+    """The files this plugin can supply for droidtop's system id: those with a source that holds a listed dump."""
+    system_id = _system_id(args.get("system"))
+    if not system_id:
+        return _ok({"files": []})
+    state = _load_state()
+    files = []
+    for item in _index()["systems"][system_id]["files"]:
+        if not item.get("md5"):
+            continue
+        sources = [s for s in item.get("src", []) if s.get("exact") and (s["kind"] != "retrobios" or state["retrobios"])]
+        if not sources:
+            continue
+        label = "retrobios" if sources[0]["kind"] == "retrobios" else "Internet Archive"
+        row = {"name": item["name"], "md5": item["md5"][:16], "source": label}
+        if sources[0].get("size"):
+            row["size"] = sources[0]["size"]
+        files.append(row)
+    return _ok({"files": files[:500]})
+
+
+def _bios_acquire(args):
+    """The job: the first source holding exactly the dump droidtop asked for, as one verified download."""
+    system_id = _system_id(args.get("system"))
+    item = _find_file(system_id, args.get("name")) if system_id else None
+    if item is None:
+        return {"ok": False, "error": "That file is not on this plugin's list"}
+    wanted = set(str(m).lower() for m in (args.get("md5") or []))
+    candidates = [c for c in _candidates(system_id, item, _load_state()) if c.exact and c.md5]
+    if wanted:
+        candidates = [c for c in candidates if c.md5.lower() in wanted] or candidates
+    if not candidates:
+        return {"ok": False, "error": "No source holds exactly the file droidtop asks for"}
+    chosen = candidates[0]
+    problem = _preflight(chosen)
+    if problem:
+        return {"ok": False, "error": problem}
+    return {"ok": True, "values": {"message": "Downloading " + item["name"], "download": json.dumps(_descriptor(item, chosen))}}
 
 
 # -------------------------------------------------------------------------------------------- entry points
@@ -571,6 +632,9 @@ def handle(call_json):
                 return _search(args)
             if op == "detail":
                 return _detail(args)
+        elif point == "emulator.bios":
+            if op == "list":
+                return _bios_list(args)
         elif point == "ui.settings":
             if op == "view":
                 return _ok(_settings_view(_load_state()))
@@ -599,9 +663,11 @@ def start_job(job_id, call, progress):
     if job_id in _cancelled:
         _cancelled.discard(job_id)
         return json.dumps({"ok": False, "error": "cancelled"})
-    if call.get("point") == "library.sources" and call.get("op") == "acquire":
+    if call.get("op") == "acquire" and call.get("point") in ("library.sources", "emulator.bios"):
         progress(10, "Asking the source")
         try:
+            if call.get("point") == "emulator.bios":
+                return json.dumps(_bios_acquire(call.get("args") or {}))
             return json.dumps(_acquire(call.get("args") or {}))
         except HostError as error:
             return json.dumps({"ok": False, "error": error.message})

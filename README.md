@@ -16,18 +16,17 @@ are, it hosts nothing.
   [Abdess/retrobios](https://github.com/Abdess/retrobios) (GitHub), and the loose files of the LibRetro BIOS collection on
   the Internet Archive (`retroarch_bios`). 305 of 386 files have a source that holds exactly the dump droidtop lists.
 - **Verifies.** A retrobios download carries its SHA-256 and size in the acquire reply, so droidtop checks the bytes.
-  An Internet Archive file is chosen by its listed MD5 and size (droidtop's descriptor checks SHA-256 only, see
-  Droidtop/tracker issues filed from this work). The plugin asks the source once (a HEAD request) that the file is
+  An Internet Archive file is chosen by its listed MD5 and size (droidtop's Downloads job verifies the descriptor's `md5`). The plugin asks the source once (a HEAD request) that the file is
   there and its size is right before it starts the job.
 - **Is configurable.** Settings: retrobios on or off, more Internet Archive items (it lists the item's files and picks
   the ones whose MD5 is on droidtop's list), and your own https address templates (`{file}`, `{system}`, `{md5}`).
 
-## How it plugs in today
+## How it plugs in
 
-droidtop has no BIOS hook yet, so the plugin offers its files through `library.sources` (Get games, search, detail and
-an acquire job): search lists a system's files (from the system you are in) or matches words across all systems. See the
-issues filed on Droidtop/tracker for the hook the Emulator setup helper needs ("Get the BIOS for this system"), several
-files in one acquire, and a place other than the games folder.
+- `emulator.bios@1` (droidtop plugin-api A11, Droidtop/tracker#415): `list {system}` says which files it can supply,
+  `acquire {system, name, md5}` is a job returning one download with `sha256` and `md5`. The Emulator setup helper shows
+  "Get the BIOS for this system", names the target, checks the MD5 against its database and writes the file.
+- `library.sources` stays for Get games (search, detail, acquire); there a file lands in the system's games folder.
 
 ## Layout
 

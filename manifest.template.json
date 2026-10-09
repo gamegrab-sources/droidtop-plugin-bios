@@ -3,12 +3,18 @@
   "origin": "gamegrab",
   "label": "BIOS and firmware",
   "description": "Unofficial plugin from gamegrab-sources, not part of droidtop. Finds the BIOS, firmware and key files your emulators ask for and downloads them from retrobios on GitHub and the Internet Archive, or from addresses you add.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "python",
   "contractVersion": 2,
   "requestsRoot": false,
   "abis": [],
   "provides": [
+    {
+      "point": "emulator.bios",
+      "version": 1,
+      "id": "bios",
+      "label": "BIOS and firmware"
+    },
     {
       "point": "library.sources",
       "version": 1,
