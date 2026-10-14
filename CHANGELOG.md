@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Shorter text: one-line description, no About row in Settings (the catalog
+  already marks the plugin Unofficial), short hints for sources and your own
+  addresses, no note on how droidtop matches files.
+- droidtop's contract 2.1 host name net.request (needs droidtop
+  0.2.0-dev.1767 or newer) and 48 KiB data reads.
+
 ## 0.2.0
 
 - Provides `emulator.bios@1` (list, acquire) for the Emulator setup helper; droidtop names the target and writes the file.

@@ -31,7 +31,7 @@ def fake_call(api, op, args=None, version=1):
         raw = store[args["name"]]
         part = raw[args["offset"] : args["offset"] + args["length"]]
         return {"ok": True, "data": {"base64": base64.b64encode(part).decode("ascii"), "eof": args["offset"] + len(part) >= len(raw)}}
-    if api == "net" and op == "http":
+    if api == "net" and op == "request":
         key = (args["method"], args["url"])
         if key not in http_answers:
             return {"ok": False, "error": {"code": "PERMISSION_DENIED", "message": "not reachable in this test: %s %s" % key}}

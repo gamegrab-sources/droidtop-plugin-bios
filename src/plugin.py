@@ -40,7 +40,9 @@ DECLARED_HOSTS = ("raw.githubusercontent.com", "archive.org")  # archive.org cov
 
 STATE_FILE = "sources.json"
 # The data API moves at most this much per call (docs/plugin-api.md 3 H1); the Flutter plugin uses the same size.
-CHUNK = 120 * 1024
+# data.read answers in base64 inside a JSON string, which crosses droidtop's broker as UTF-16: 120 KiB
+# came back as 320 KB binder replies (logcat, BlueStacks, 2026-10-14). 48 KiB keeps a reply near 128 KB.
+CHUNK = 48 * 1024
 
 # droidtop names systems the ES-DE way; the BIOS database uses Batocera's ids. The few that differ.
 ALIASES = {
@@ -125,7 +127,7 @@ def _call(api, op, args=None, version=1):
 
 def _http(url, method="GET", headers=None, timeout_ms=20000):
     """(status, final url, headers, body text, truncated) or raises HostError."""
-    reply = _call("net", "http", {"url": url, "method": method, "headers": headers or {}, "as": "text", "timeoutMs": timeout_ms})
+    reply = _call("net", "request", {"url": url, "method": method, "headers": headers or {}, "as": "text", "timeoutMs": timeout_ms})
     if not reply.get("ok"):
         error = reply.get("error") or {}
         raise HostError(error.get("code", "FAILED"), error.get("message", "request failed"))
@@ -378,7 +380,7 @@ def _detail(args):
     candidates = _candidates(system_id, item, state)
     rows = [
         _info("system", "System", system["name"]),
-        _info("file", "File", item["name"], "droidtop's Emulator setup helper names a file by its MD5 and then by this name"),
+        _info("file", "File", item["name"]),
     ]
     if item.get("dir"):
         rows.append(_info("dir", "Usually kept in", item["dir"]))
@@ -388,7 +390,7 @@ def _detail(args):
     elif item.get("note"):
         rows.append(_info("note", "About this file", None, item["note"]))
     if not candidates:
-        rows.append(_info("none", "No source for this file", None, "Turn on a source on this plugin's Settings page, or add an address of your own there. Otherwise give droidtop the file yourself."))
+        rows.append(_info("none", "No source for this file", None, "Turn on a source or add your own address in Settings."))
         return _ok(_view(item["name"], rows, "From BIOS and firmware"))
     options = [{"value": str(i), "label": c.describe()[:190]} for i, c in enumerate(candidates)]
     rows.append({"type": "choice", "id": "source", "title": "Get it from", "options": options[:100], "value": "0"})
@@ -406,17 +408,11 @@ def _detail(args):
 
 def _settings_view(state):
     rows = [
-        _info(
-            "about",
-            "BIOS and firmware",
-            None,
-            "Unofficial plugin from gamegrab-sources. It lists the files droidtop's emulator setup knows and downloads them from the sources below. Files are checked by the source's SHA-256 where it gives one.",
-        ),
         {
             "type": "toggle",
             "id": "retrobios",
             "title": "retrobios on GitHub",
-            "subtitle": "Single files with SHA-256, for most systems, the 3DS and the Switch",
+            "subtitle": "Checked single files for most systems",
             "value": bool(state["retrobios"]),
             "action": {"kind": "call", "op": "setRetrobios"},
         },
@@ -424,7 +420,7 @@ def _settings_view(state):
             "type": "text",
             "id": "ia_items",
             "title": "More Internet Archive items",
-            "subtitle": "Item names, separated by commas. The LibRetro BIOS collection is always included.",
+            "subtitle": "Separate names with commas. LibRetro's BIOS set is always on.",
             "value": ", ".join(state["ia_items"]),
             "action": {"kind": "call", "op": "setItems"},
         },
@@ -432,7 +428,7 @@ def _settings_view(state):
             "type": "text",
             "id": "new_url",
             "title": "Add an address of your own",
-            "subtitle": "https address; {file}, {system} and {md5} stand for the file's name, system and MD5. Label first: Name = https://...",
+            "subtitle": "Name = https://.../{system}/{file} ({md5} works too)",
             "value": "",
             "action": {"kind": "call", "op": "addUrl"},
         },
