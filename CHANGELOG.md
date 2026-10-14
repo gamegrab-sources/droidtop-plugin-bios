@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- A search no longer lists a system for a word inside its name: "witch" listed
+  every Nintendo Switch file in a PC search (rig, 2026-10-14). Systems match on
+  the start of a word or of their id.
+
 ## 0.3.0
 
 - Shorter text: one-line description, no About row in Settings (the catalog

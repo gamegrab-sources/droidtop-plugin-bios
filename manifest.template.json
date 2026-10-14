@@ -3,7 +3,7 @@
   "origin": "gamegrab",
   "label": "BIOS and firmware",
   "description": "Finds the BIOS and firmware files your emulators ask for and downloads them, checked where the source gives a checksum.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "kind": "python",
   "contractVersion": 2,
   "requestsRoot": false,

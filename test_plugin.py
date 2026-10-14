@@ -101,6 +101,11 @@ class BiosPluginTest(unittest.TestCase):
         self.assertEqual({"switch"}, set(r["platform"] for r in by_system))
         self.assertEqual([], send("library.sources", "search", query="", values={})["data"]["results"])
 
+    def test_a_word_inside_a_system_name_does_not_list_the_system(self):
+        rows = send("library.sources", "search", query="witch", values={})["data"]["results"]
+        self.assertFalse([r for r in rows if r["platform"] == "switch"])
+        self.assertTrue(send("library.sources", "search", query="swi", values={})["data"]["results"])
+
     def test_a_file_with_no_source_still_shows_and_says_so(self):
         reply = send("library.sources", "search", query="", values={}, context={"system": {"id": "apple2", "name": "Apple II"}})
         badges = {r["title"]: r["badges"][0] for r in reply["data"]["results"]}

@@ -358,7 +358,9 @@ def _search(args):
     elif query:
         for sid in sorted(systems):
             system = systems[sid]
-            by_system = query in sid.lower() or query in system["name"].lower()
+            # A system matches on a whole word's start ("swi" finds Nintendo Switch), never mid-word: on the rig
+            # (2026-10-14) a PC search for "witch" listed every Switch firmware file.
+            by_system = sid.lower().startswith(query) or re.search(r"\b" + re.escape(query), system["name"].lower()) is not None
             for item in system["files"]:
                 if by_system or query in item["name"].lower():
                     results.append(_result(sid, system, item))
