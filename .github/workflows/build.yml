@@ -91,8 +91,8 @@ jobs:
           id="$(python3 -c "import json; print(json.load(open('build/manifest.json'))['id'])")"
           version="$(python3 -c "import json; print(json.load(open('build/manifest.json'))['version'])")"
           cp build/manifest.json "$id.manifest.json"
-          gh release create "v$version" "$id.droidplugin.tar.xz" "$id.manifest.json" \
+          gh release create "v$version" "$id.droidplugin.tar.xz" "$id.manifest.json" droidtop-plugin-key.json \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
             --title "BIOS and firmware $version" \
-            --notes "Signed droidtop plugin bundle built from ${{ github.sha }}. Unofficial (gamegrab-sources): its key is certified by the gamegrab-sources master, which droidtop trusts once you add the gamegrab-sources catalog. What changed: CHANGELOG.md."
+            --notes "Signed droidtop plugin bundle built from ${{ github.sha }}. Unofficial (gamegrab-sources): its key is certified by the gamegrab root, which droidtop trusts once you add the gamegrab-sources catalog. What changed: CHANGELOG.md."
