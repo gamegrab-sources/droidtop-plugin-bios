@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2
+
+- Declares that it serves every system (`"*"`): BIOS and firmware files exist for consoles and PCs alike.
+  Needs a droidtop that reads `systems` on `library.sources` (docs/plugin-api.md 1.6); an older
+  droidtop ignores the field and lists the source everywhere, as before.
+
 ## 0.3.1
 
 - A search no longer lists a system for a word inside its name: "witch" listed

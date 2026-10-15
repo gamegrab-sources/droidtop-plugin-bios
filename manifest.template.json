@@ -3,7 +3,7 @@
   "origin": "gamegrab",
   "label": "BIOS and firmware",
   "description": "Finds the BIOS and firmware files your emulators ask for and downloads them, checked where the source gives a checksum.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "kind": "python",
   "contractVersion": 2,
   "requestsRoot": false,
@@ -19,7 +19,8 @@
       "point": "library.sources",
       "version": 1,
       "id": "bios",
-      "label": "BIOS and firmware"
+      "label": "BIOS and firmware",
+      "systems": "*"
     },
     {
       "point": "ui.settings",
