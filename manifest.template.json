@@ -6,6 +6,7 @@
   "version": "0.3.2",
   "kind": "python",
   "contractVersion": 2,
+  "category": "sources",
   "requestsRoot": false,
   "abis": [],
   "provides": [
