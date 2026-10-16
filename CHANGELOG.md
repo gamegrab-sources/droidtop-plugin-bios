@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3
+
+- Names its kind for droidtop's Plugins page (`category`, docs/plugin-api.md 1.2, Droidtop/tracker#179).
+
 ## 0.3.2
 
 - Declares that it serves every system (`"*"`): BIOS and firmware files exist for consoles and PCs alike.
