@@ -96,3 +96,22 @@ jobs:
             --target "${{ github.sha }}" \
             --title "BIOS and firmware $version" \
             --notes "Signed droidtop plugin bundle built from ${{ github.sha }}. Unofficial (gamegrab-sources): its key is certified by the gamegrab root, which droidtop trusts once you add the gamegrab-sources catalog. What changed: CHANGELOG.md."
+
+      - name: Ask the gamegrab-sources catalog to reindex
+        # droidtop reads gamegrab-sources/catalog's index.json, so a release is offered only once that index lists
+        # it. The catalog rebuilds on a plugin-published dispatch (docs/CATALOG-FORMAT.md there); a dispatch to
+        # another repository needs a token of its own, as this job's GITHUB_TOKEN cannot reach it. Without the
+        # CATALOG_DISPATCH_TOKEN secret this is a no-op and the catalog's scheduled run lists the release within hours.
+        if: steps.sign.outputs.signed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CATALOG_DISPATCH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "No CATALOG_DISPATCH_TOKEN; the catalog lists this release on its schedule."
+            exit 0
+          fi
+          gh api repos/gamegrab-sources/catalog/dispatches \
+            -f event_type=plugin-published \
+            -f "client_payload[repo]=$GH_REPO"
