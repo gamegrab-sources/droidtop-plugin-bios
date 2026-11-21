@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.4
+
+- Get the BIOS tries each source in turn: retrobios no longer has its Nintendo files, so a DS BIOS
+  now comes from the Internet Archive copy instead of failing with "no longer has this file". When
+  no source has it, the message says what each one answered (Droidtop/tracker#415).
+
 ## 0.3.3
 
 - Names its kind for droidtop's Plugins page (`category`, docs/plugin-api.md 1.2, Droidtop/tracker#179).

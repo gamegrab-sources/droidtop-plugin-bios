@@ -595,7 +595,10 @@ def _bios_list(args):
 
 
 def _bios_acquire(args):
-    """The job: the first source holding exactly the dump droidtop asked for, as one verified download."""
+    """The job: the first source that holds exactly the dump droidtop asked for and still has it, as one verified
+    download. Each source is asked in turn: retrobios dropped its Nintendo folders, and the console's "Get bios7.bin"
+    stopped at "retrobios (GitHub) no longer has this file" while the Internet Archive item held the same dump
+    (Droidtop/tracker#415, 2026-11-20). Only when none has it does the job fail, saying what each source answered."""
     system_id = _system_id(args.get("system"))
     item = _find_file(system_id, args.get("name")) if system_id else None
     if item is None:
@@ -606,11 +609,13 @@ def _bios_acquire(args):
         candidates = [c for c in candidates if c.md5.lower() in wanted] or candidates
     if not candidates:
         return {"ok": False, "error": "No source holds exactly the file droidtop asks for"}
-    chosen = candidates[0]
-    problem = _preflight(chosen)
-    if problem:
-        return {"ok": False, "error": problem}
-    return {"ok": True, "values": {"message": "Downloading " + item["name"], "download": json.dumps(_descriptor(item, chosen))}}
+    problems = []
+    for chosen in candidates:
+        problem = _preflight(chosen)
+        if problem is None:
+            return {"ok": True, "values": {"message": "Downloading " + item["name"], "download": json.dumps(_descriptor(item, chosen))}}
+        problems.append(problem)
+    return {"ok": False, "error": "; ".join(problems)}
 
 
 # -------------------------------------------------------------------------------------------- entry points

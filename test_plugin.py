@@ -245,6 +245,23 @@ class BiosPluginTest(unittest.TestCase):
         http_answers[("HEAD", RETRO_SCPH)] = {"status": 404, "url": RETRO_SCPH, "headers": {}, "body": ""}
         self.assertIn("no longer has", job("acquire", point="emulator.bios", system="psx", name="scph5500.bin", md5=[])["error"])
 
+    def test_the_helper_acquire_moves_on_to_the_next_source_when_one_has_lost_the_file(self):
+        # The console, 2026-11-20: retrobios no longer has the DS BIOS; the Internet Archive item does.
+        retro = plugin.RETROBIOS_RAW + "bios/Nintendo/DS/NDS_Bios7.bin"
+        archive = plugin.IA_DOWNLOAD + "retroarch_bios/bios7.bin"
+        http_answers[("HEAD", retro)] = {"status": 404, "url": retro, "headers": {}, "body": ""}
+        http_answers[("HEAD", archive)] = {"status": 200, "url": archive, "headers": {"content-length": "16384"}, "body": ""}
+        reply = job("acquire", point="emulator.bios", system="nds", name="bios7.bin", md5=["df692a80a5b1bc90728bc3dfc76cd948"])
+        self.assertTrue(reply["ok"], reply)
+        download = json.loads(reply["values"]["download"])
+        self.assertEqual(archive, download["url"])
+        self.assertEqual("df692a80a5b1bc90728bc3dfc76cd948", download["md5"])
+        # With neither, it says what each answered.
+        http_answers[("HEAD", archive)] = {"status": 404, "url": archive, "headers": {}, "body": ""}
+        error = job("acquire", point="emulator.bios", system="nds", name="bios7.bin", md5=[])["error"]
+        self.assertIn("retrobios (GitHub) no longer has", error)
+        self.assertIn("Internet Archive: retroarch_bios no longer has", error)
+
     # ----------------------------------------------------------------- misc
 
     def test_unknown_points_and_ops_are_error_replies(self):
